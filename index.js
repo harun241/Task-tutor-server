@@ -24,12 +24,15 @@ const client = new MongoClient(uri, {
 });
 
 let classesCollection;
+let transactionsCollection;
 
 // MongoDB connection function
 async function connectDB() {
   try {
     await client.connect();
     const db = client.db(process.env.DB_NAME);
+    transactionsCollection = db.collection("transactions"); // Budget Tracker collection
+
     classesCollection = db.collection("classes"); // collection for classes
     console.log("MongoDB connected successfully!");
   } catch (err) {
@@ -103,6 +106,64 @@ app.delete("/api/classes/:id", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
+
+//Budget tracker
+// Get all transactions
+app.get("/api/transactions", async (req, res) => {
+  try {
+    const transactions = await transactionsCollection.find().toArray();
+    res.json(transactions);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Add new transaction
+app.post("/api/transactions", async (req, res) => {
+  try {
+    const { type, category, amount, date } = req.body;
+    if (!type || !category || !amount) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const result = await transactionsCollection.insertOne({
+      type,
+      category,
+      amount,
+      date: date || new Date()
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Delete transaction
+app.delete("/api/transactions/:id", async (req, res) => {
+  try {
+    await transactionsCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+    res.json({ message: "Transaction deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update transaction (optional)
+app.put("/api/transactions/:id", async (req, res) => {
+  try {
+    const updatedTransaction = req.body;
+    const result = await transactionsCollection.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updatedTransaction },
+      { returnDocument: "after" }
+    );
+    res.json(result.value);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 // ------------------- Start server ------------------- //
 
